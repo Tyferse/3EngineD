@@ -40,8 +40,14 @@ class Point:
 
 class Vector:
     # vs = VectorSpace()
-    def __init__(self, pt1):
-        self.point = pt1  # Point(x, y, z)
+    def __init__(self, *args):
+        if len(args) == 1:
+            assert isinstance(args[0], Point)
+            self.point = args[0]  # Point(x, y, z)
+        elif len(args) == 3:
+            assert all(map(isinstance, args, [(int, float)] * 3))
+            self.point = Point(*args)
+            
         # self.vs = vs
     
     def __str__(self):
@@ -158,9 +164,13 @@ class Camera:
         self.pos = position
         self.look_at = look_at
         self.look_dir = look_dir
-        
+
+        config = configparser.ConfigParser()
+        config.read("config.cfg")
+        h = int(config['SCREEN']['screen_width'])
+        w = int(config['SCREEN']['screen_hight'])
         self.fov = fov
-        # self.vfov = fov * h / w
+        self.vfov = fov * h / w
         
         self.draw_dist = draw_dist
     
@@ -186,4 +196,3 @@ if __name__ == "__main__":
     v2 = Vector(p2)
     print(v1 ** v2)
     print(v1.len())
-    print(p1 * 3, 3 * p1)

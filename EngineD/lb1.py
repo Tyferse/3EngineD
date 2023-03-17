@@ -101,6 +101,8 @@ class Vector:
         :param other:
         :return:
         """
+        assert isinstance(other, (int, float))
+        
         return Vector(self.point * other)
     
     def __truediv__(self, other):
@@ -110,7 +112,7 @@ class Vector:
         :param other:
         :return:
         """
-        assert isinstance(other, int)
+        assert isinstance(other, (int, float))
         
         return Vector(self.point / other)
     
@@ -167,8 +169,8 @@ class Camera:
 
         config = configparser.ConfigParser()
         config.read("config.cfg")
-        h = int(config['SCREEN']['screen_width'])
-        w = int(config['SCREEN']['screen_hight'])
+        h = int(config['SCREEN']['width'])
+        w = int(config['SCREEN']['hight'])
         self.fov = fov
         self.vfov = fov * h / w
         
@@ -179,20 +181,107 @@ class Camera:
 
 
 class Object:
-    def __init__(self, pos: Point, rotation: Vector):
+    def __init__(self, pos: Point, rotation: Vector, **params):
         self.pos = pos
         self.rot = rotation
+        self.pr = params
     
+    @abstractmethod
     def contains(self, pt: Point) -> bool:
+        pass
+    
+    @abstractmethod
+    def intersect(self, v: Vector) -> Point:
+        """
+        Точка пересечения или выходящая за
+        поле видимости (дальности прорисовки) (draw_distance)
+        
+        :param v:
+        :return:
+        """
+        pass
+    
+    @abstractmethod
+    def nearest_point(self, *pts: list[Point]) -> Point:
+        pass
+
+
+class Plain(Object):
+    """
+    Плоскость
+
+    Координаты, направляющая плоскость
+    
+    Параметрическое уравнение плоскости
+    {x = a * t + b * s + c
+     y = f * t + g * s + h
+     z = p * t + q * s + v
+    }
+    
+    a, b, f, g, p, q - направляющие вектора
+    c, h, v - константы (точки?)
+    
+    t и s - параметры (константы)
+    """
+    pass
+
+
+class BoundedPlain(Plain):
+    """
+    Ограниченная плоскость
+    
+    delta_t
+    delta_s
+    
+    -delta_t <= t <= delta_t - ограничения для параметра t
+    -delta_s <= s <= delta_s - ограничения для параметра s
+    """
+    pass
+
+
+class Sphere(Object):
+    def contains(self, pt: Point) -> bool:
+        """
+        x**2 + y**2 <= params.radius
+        
+        :param pt:
+        :return:
+        """
+        pass
+
+
+class Cube(Object):
+    def contains(self, pt: Point) -> bool:
+        """
+        y = centr.y + params.delta_y
+        
+        {(centr.x + delta_x) + (centr.z + delta_z) = -y;
+         centr.x - delta_x <= pt.x <= centr.x + delta_x
+         }
+        Или
+         
+        Уравнение грани (определитель)
+         | (x - centr.x) (y - centr.y + delta_y) (z - centr.z) |
+         | delta_x       0                       0             |
+         | 0             0                       delta_z       |
+         
+        Ограничения плоскости (расположения точки)
+        centr.x - delta_x <= pt.x <= centr.x + delta_x
+         
+        6 ограниченных плоскостей
+        
+        :param pt:
+        :return:
+        """
         pass
 
 
 if __name__ == "__main__":
     vs = VectorSpace()
-    Vector.vs = vs  # Передача векторного пространства в класс Vector
+    Vector.vs = vs  # Передача векторного пространства в классы
     p1 = Point(1, 2, 3)
     p2 = Point(3, 2, 1)
     v1 = Vector(p1)
     v2 = Vector(p2)
-    print(v1 ** v2)
-    print(v1.len())
+    # print(v1 ** v2)
+    # print(v1.len())

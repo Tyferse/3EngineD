@@ -442,10 +442,63 @@ class BoundedPlane(Plane):
                   self.rot * Vector(pt_begin)) / (self.rot * v)
             if 0 <= t0 <= 1 and self.in_boundaries((v * t0).point):
                 return v * t0
-            
+
         elif self.contains(v.point):
-            """HeLp mE"""
+            # Расстояние от точки до прямой
+            r = self.rot * Vector(pt_begin) / self.rot.len()
+            if r == 0 and 0 <= (self.rot.point.coords[0]
+                                - pt_begin) / v.point.coords[0] <= 1:
+                return self.pos
     
+            # Проекции вектора из точки центра плоскости
+            # к точке начала вектора v на направляющие вектора плоскости
+            r_begin = Vector(pt_begin - self.pos)
+            begin_pr1 = r_begin * v1 / r_begin.len()
+            begin_pr2 = r_begin * v2 / r_begin.len()
+    
+            # Проекции вектора из точки центра плоскости
+            # к точке конца вектора v на направляющие вектора плоскости
+            r_end = r_begin + v
+            end_pr1 = r_end * v1 / r_end.len()
+            end_pr2 = r_end * v2 / r_end.len()
+    
+            # Возвращаем координаты точки, ближайшей к центру,
+            # если хотя бы часть вектора лежит в границах плоскости
+            if begin_pr1 > self.pr['dv1'] and end_pr1 > self.pr['dv1'] \
+                or begin_pr2 > self.pr['dv2'] \
+                and end_pr2 > self.pr['dv2']:
+                return Vector.vs.init_pt
+    
+            # Ограничение вектора плоскостью
+            def value_limit(value, lim):
+                if value < -lim:
+                    value = -lim
+                elif value > lim:
+                    value = lim
+        
+                return value
+    
+            # if begin_pr1 < -self.pr['dv1']:
+            #     begin_pr1 = -self.pr['dv1']
+            # elif begin_pr1 > self.pr['dv1']:
+            #     begin_pr1 = self.pr['dv1']
+            begin_pr1 = value_limit(begin_pr1, self.pr['dv1'])
+    
+            begin_pr2 = value_limit(begin_pr2, self.pr['dv2'])
+    
+            end_pr1 = value_limit(end_pr1, self.pr['dv1'])
+    
+            end_pr2 = value_limit(end_pr2, self.pr['dv2'])
+    
+            r_begin = self.v1 * begin_pr1 + self.v2 * begin_pr2 \
+                      + Vector(self.pos)
+            r_end = self.v1 * end_pr1 + self.v2 * end_pr2 \
+                    + Vector(self.pos)
+            # Вектор v, ограниченный плоскостью
+            v_tmp = r_end - r_begin - Vector(pt_begin)
+            return Plane(self.pos, self.rot).intersect(v_tmp,
+                                                       r_begin.point)
+
         return Vector.vs.init_pt
 
     def nearest_point(self, *pts: Point) -> Point:

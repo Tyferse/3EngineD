@@ -478,10 +478,6 @@ class BoundedPlane(Plane):
         
                 return value
     
-            # if begin_pr1 < -self.pr['dv1']:
-            #     begin_pr1 = -self.pr['dv1']
-            # elif begin_pr1 > self.pr['dv1']:
-            #     begin_pr1 = self.pr['dv1']
             begin_pr1 = value_limit(begin_pr1, self.pr['dv1'])
     
             begin_pr2 = value_limit(begin_pr2, self.pr['dv2'])

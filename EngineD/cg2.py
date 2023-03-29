@@ -1,7 +1,6 @@
 import configparser
-import itertools
 import math
-from abc import ABCMeta, abstractmethod
+from abc import abstractmethod
 
 
 class Point:
@@ -156,6 +155,9 @@ class VectorSpace:
                 VectorSpace.basis[i] = d.norm()
 
 
+Vector.vs = VectorSpace()  # Передача векторного пространства в вектор
+
+
 class Camera:
     def __init__(self, position, look_at, look_dir, fov, draw_dist):
         """
@@ -231,33 +233,34 @@ class Plane(Object):
         #            (pt.coords[i] - self.pos.coords[i])
         #            for i in range(3)) == 0
         return self.rot * Vector(pt - self.pos) == 0
-    
+
     def intersect(self, v: Vector, pt_begin: Point = Vector.vs.init_pt):
         """
         Скалярное произведение вектора нормали к плоскости и вектора v
         не равно нулю и вектор v не лежит на плоскости, то вектор v
         не пересекает плоскость.
-        
+
         Если координаты вектора v соответствуют уравнению плоскости,
         то этот вектор лежит на плоскости.
-        
+
         Иначе, если скалярное произведение вектора нормали к плоскости
         и вектора v равно нулю и вектор v не лежит на плоскости,
         то этот вектор параллелен ей и не пересекает её
         ни в какой точке.
-        
+
         :param v: Радиус-вектор отрезка.
         :param pt_begin: Точка начала вектора.
         :return: Точка пересечения или точка,
                  ближайшая к центру плоскости.
         """
-        if self.rot * v != 0 and not self.contains(pt_begin):
+        if self.rot * v != 0 and not (self.contains(pt_begin)
+                                      and self.contains(v.point)):
             """
             Параметрическое уравнение прямой, на которой лежит вектор v:
             x = v.point.coords[0] * t0 + pt_begin.coords[0]
             y = v.point.coords[1] * t0 + pt_begin.coords[1]
             z = v.point.coords[2] * t0 - pt_begin.coords[2]
-            
+
             Подставляем параметрические значения в уравнение плоскости:
             self.rot.point.coords[0] * (v.point.coords[0] * t0
                 + pt_begin.coords[0] - self.pos.coords[0]) +
@@ -265,26 +268,26 @@ class Plane(Object):
                 + pt_begin.coords[1] - self.pos.coords[1]) +
             self.rot.point.coords[2] * (v.point.coords[2] * t0
                 + pt_begin.coords[2] - self.pos.coords[2]) = 0
-            
+
             Ищем параметр t0:
             xi, yi, zi - координаты начальной точки
             xv, yv, zv - координаты вектора v
             xс, yс, zс - координаты точки центра плоскости
             A, B, C - координаты вектора нормали к плоскости
-            
+
             A * xv * t0 - A * xс + A * xi +
             B * yv * t0 - B * yс + B * yi +
             C * zv * t0 - C * zс + C * zi = 0
-            
+
             t0 * (A * xv + B * yv + C * zv) = A * xс + B * yс + C * zс
                                             - A * xi - B * yi - C * zi
-            
+
             t0 = (A * xс + B * yс * C * zс - A * xi - B * yi - C * zi) /
                  (A * xv + B * yv + C * zv)
-            
+
             t0 = (self.rot * self.pos - self.rot * Vector(pt_begin)) /
                  (self.rot * v)
-            
+
             Подставляем значение параметра в параметрическое
             уравнение прямой и находим координаты точки пересечения:
             Q = self.rot.point * t0 - vs.init_pt
@@ -295,14 +298,14 @@ class Plane(Object):
             t0 = (self.rot * Vector(self.pos) -
                   self.rot * Vector(pt_begin)) / (self.rot * v)
             if 0 <= t0 <= 1:
-                return v * t0
-            
+                return v.point * t0 + pt_begin
+    
         elif self.contains(pt_begin):
             """
             Возвращаем ближайшую к центру плоскости точку.
-            
+
             (x - xi) / xv = (y - yi) / yv = (z - zi)  zv
-            
+
             projection = v * Vector(self.pos - pt_begin) / v.len() -
             """
             # Расстояние от точки до прямой
@@ -310,21 +313,21 @@ class Plane(Object):
             if r == 0 and 0 <= (self.rot.point.coords[0]
                                 - pt_begin) / v.point.coords[0] <= 1:
                 return self.pos
-            
+        
             # Вектор, соединяющий точку центра и точку начала вектора v
-            tempv = Vector(self.pos - pt_begin)
-            # Проекция вектора tempv на вектор V
-            projection = v * tempv / tempv.len()
-            # Возвращаем координаты точки, ближайшей к вектору
+            v_tmp = Vector(self.pos - pt_begin)
+            # Проекция вектора v_tmp на вектор V
+            projection = v * v_tmp / v_tmp.len()
+            # Возвращаем координаты точки, ближайшей к центру
             if 0 <= projection <= 1:
                 return projection * v.point + pt_begin
             elif projection > 1:
                 return v.point
             else:
                 return pt_begin
-        
-        return Vector.vs.init_pt
     
+        return Vector.vs.init_pt
+
     def nearest_point(self, *pts: Point) -> Point:
         r_min = 10 ** 9
         min_pt = Vector.vs.init_pt
@@ -333,7 +336,7 @@ class Plane(Object):
             if r < r_min:
                 r_min = r
                 min_pt = pt
-        
+    
         return min_pt
 
 
@@ -352,46 +355,27 @@ class BoundedPlane(Plane):
         """
         Стандартная инициализация плоскости + поиск двух направляющих
         и ортогональных векторов плоскости.
-        
+
         :param pos:
         :param rotation:
         :param params:
         """
         super().__init__(pos, rotation, **params)
-        
+    
         """
         Нахождения направляющих ортогональных векторов плоскости:
-        
+
         1. Выбираем произвольный вектор, лежащий в плоскости.
            Например, можно взять вектор (1, 0, -A / C),
            если C не равно 0.
            Если C равно 0, то можно взять вектор (0, 1, -B / A),
            если A не равно 0.
-           
-           ?????????????????????????
-           A = yp1 * zp2 - zp1 * yp2
-           B = -xp1 * zp2 + zp1 * xp2
-           C = xp1 * yp2 - yp1 * xp2
-           
-           xp1 = B, zp1 = 0:
-           A(xp1 - x0) + B(yp1 - y0) + -C * z0 = 0
-           A * xp1 + B * yp1 = A * x0 + B * y0 + C * z0
-           yp1 = (A * x0 + B * y0 + C * z0 - A * B) / B =
-               = x0 * (A / B) + y0 + (C / B) * z - A
 
         2. Находим векторное произведение вектора нормали
            и произвольного вектора:
 
-           v11 = [n(A, B, C) x (1, 0, -A / C)] =
-           = (B * (-A / C), A^2 / C + C, -B)
-           
-           v21 = [n(A, B, C) x (0, 1, -B / A)] = (-B^2 / A - C, B, A)
-           
-           v2 = [n(A, B, C) x v1(B, -A, 0)] =
-           = (A * C, -C * B, -A^2 - B^2)
-           
            v1 = (B, -A, 0)
-           v2 = (C * B, -C * A, A^2 + B^2)
+           v2 = (A * C, -C * B, -A^2 - B^2)
 
         3. Нормализуем полученные векторы:
 
@@ -412,89 +396,86 @@ class BoundedPlane(Plane):
     def in_boundaries(self, pt: Point) -> bool:
         """
         Проверка координат точки на соответствие границам плоскости.
-        
+
         :param pt: Точка
         :return:
         """
         corner = self.v1 * self.pr['dv1'] + self.v2 * self.pr['dv2']
         delta_x, delta_y, delta_z = corner.point.coords
-        return abs(pt.coords[0] - self.pos.coords[0]) <= delta_x \
-            and abs(pt.coords[1] - self.pos.coords[1]) <= delta_y \
-            and abs(pt.coords[2] - self.pos.coords[2]) <= delta_z
+        return abs(pt.coords[0] - self.pos.coords[0]) <= abs(delta_x) \
+            and abs(pt.coords[1] - self.pos.coords[1]) <= abs(delta_y) \
+            and abs(pt.coords[2] - self.pos.coords[2]) <= abs(delta_z)
 
     def contains(self, pt: Point) -> bool:
-        # s = sum(self.rot.point.coords[i] *
-        #         (pt.coords[i] - self.pos.coords[i]) for i in range(3))
         if self.in_boundaries(pt):
             return self.rot * Vector(pt - self.pos) == 0
-        
+    
         return False
 
     def intersect(self, v: Vector, pt_begin: Point = Vector.vs.init_pt):
         """
-        
+
         :param v: Радиус-вектор отрезка
         :param pt_begin: Точка начала вектора v
         :return:
         """
-        if self.rot * v != 0 and not self.contains(v.point):
+        if self.rot * v != 0 and not (self.contains(pt_begin)
+                                      and self.contains(v.point)):
             t0 = (self.rot * Vector(self.pos) -
                   self.rot * Vector(pt_begin)) / (self.rot * v)
-            if 0 <= t0 <= 1 and self.in_boundaries((v * t0).point):
-                return v * t0
-
-        elif self.contains(v.point):
+            int_pt = v.point * t0 + pt_begin
+            if 0 <= t0 <= 1 and self.in_boundaries(int_pt):
+                return int_pt
+    
+        elif self.rot * Vector(v.point - self.pos) == 0:
             # Расстояние от точки до прямой
             r = self.rot * Vector(pt_begin) / self.rot.len()
             if r == 0 and 0 <= (self.rot.point.coords[0]
                                 - pt_begin) / v.point.coords[0] <= 1:
                 return self.pos
-    
+        
             # Проекции вектора из точки центра плоскости
             # к точке начала вектора v на направляющие вектора плоскости
             r_begin = Vector(pt_begin - self.pos)
-            begin_pr1 = r_begin * v1 / r_begin.len()
-            begin_pr2 = r_begin * v2 / r_begin.len()
-    
+            begin_pr1 = r_begin * self.v1 / r_begin.len()
+            begin_pr2 = r_begin * self.v2 / r_begin.len()
+        
             # Проекции вектора из точки центра плоскости
             # к точке конца вектора v на направляющие вектора плоскости
             r_end = r_begin + v
-            end_pr1 = r_end * v1 / r_end.len()
-            end_pr2 = r_end * v2 / r_end.len()
-    
+            end_pr1 = r_end * self.v1 / r_end.len()
+            end_pr2 = r_end * self.v2 / r_end.len()
+        
             # Возвращаем координаты точки, ближайшей к центру,
             # если хотя бы часть вектора лежит в границах плоскости
             if begin_pr1 > self.pr['dv1'] and end_pr1 > self.pr['dv1'] \
                 or begin_pr2 > self.pr['dv2'] \
-                and end_pr2 > self.pr['dv2']:
+               and end_pr2 > self.pr['dv2']:
                 return Vector.vs.init_pt
-    
+        
             # Ограничение вектора плоскостью
             def value_limit(value, lim):
                 if value < -lim:
                     value = -lim
                 elif value > lim:
                     value = lim
-        
+            
                 return value
-    
+        
             begin_pr1 = value_limit(begin_pr1, self.pr['dv1'])
-    
             begin_pr2 = value_limit(begin_pr2, self.pr['dv2'])
-    
             end_pr1 = value_limit(end_pr1, self.pr['dv1'])
-    
             end_pr2 = value_limit(end_pr2, self.pr['dv2'])
-    
+        
             r_begin = self.v1 * begin_pr1 + self.v2 * begin_pr2 \
-                      + Vector(self.pos)
+                + Vector(self.pos)
             r_end = self.v1 * end_pr1 + self.v2 * end_pr2 \
-                    + Vector(self.pos)
+                + Vector(self.pos)
             # Вектор v, ограниченный плоскостью
             v_tmp = r_end - r_begin - Vector(pt_begin)
             return Plane(self.pos, self.rot).intersect(v_tmp,
                                                        r_begin.point)
-
+    
         return Vector.vs.init_pt
 
     def nearest_point(self, *pts: Point) -> Point:
@@ -502,59 +483,192 @@ class BoundedPlane(Plane):
 
 
 class Sphere(Object):
+    def __init__(self, pos: Point, rotation: Vector, **params):
+        super().__init__(pos, rotation, **params)
+        self.r = self.pr['radius']
+        self.rot = self.rot.norm() * self.r
+    
     def contains(self, pt: Point) -> bool:
         """
         x**2 + y**2 + z**2 <= params.radius
-        
+
         :param pt:
         :return:
         """
         return pt.coords[0] ** 2 + pt.coords[1] ** 2 + \
-            pt.coords[2] ** 2 <= self.pr['radius']
+            pt.coords[2] ** 2 <= self.r
     
-    def intersect(self, v: Vector, pt2: Point = Vector.vs.init_pt):
+    def intersect(self, v: Vector, pt_begin: Point = Vector.vs.init_pt):
         """
-        
-        :param pt2:
+
+        :param pt_begin:
         :param v:
         :return:
         """
         
         """
-        Coming soon...
+        Для определения координат точек пересечения сферы и вектора
+        необходимо решить систему уравнений,
+        состоящую из уравнения сферы и уравнения прямой,
+        заданной вектором.
+        Уравнение сферы имеет вид:
+
+        (x - x0)**2 + (y - y0)**2 + (z - z0)**2 = r**2
+
+        Уравнение прямой, заданной вектором,
+        имеет параметрическое представление:
+
+        x = t * xv + x0
+        y = t * yv + y0
+        z = t * zv + z0
+
+        где (x0, y0, z0) - координаты начальной точки вектора,
+        (xv, yv, zv) - координаты направляющего вектора, t - параметр.
+
+        Подставив параметрическое представление прямой
+        в уравнение сферы, получим квадратное уравнение
+        относительно параметра t:
+
+        xc, yc, zc - координаты центра сферы
+
+        (t * xv + x0 - xc) * (t * xv + x0 - xc) = (t * xv)**2
+        + t * xv * x0 - t * xv * xc + t * xv * x0 + x0**2
+        - x0 * xc - t * xv * xc - x0 * xc + xc**2 = xv**2 * t**2
+        + (2 * xv * x0 - 2 * xv * xc) * t
+        + (x0**2 - 2 * x0 * xc + xc**2) = xv**2 * t**2 +
+        2 * (xv * (x0 - xc)) * t + (x0**2 + xc**2 - 2 * x0 * xc)
+
+        (xv**22 + yv**2 + zv**2) * t**2 +
+        + 2 * (xv * (x0 - xc) + yv * (y0 - yc) + zv * (z0 - zc)) * t +
+        + (x0**2 + y0**2 + z0**2 + xc**2 + yc**2 + zc**2 -
+         - 2 * (x0 * xc + y0 * yc + z0 * zc) - r**2) = 0
+
+        Решив это уравнение относительно параметра t,
+        найдем координаты точек пересечения сферы и вектора:
+
+        t1 = (-b + sqrt(b**2 - 4 * a * c)) / 2 * a
+        t2 = (-b - sqrt(b**2 - 4 * a * c)) / 2 * a
+
+        где a = xv**2 + yv**2 + zv**2,
+            b = 2 * (xv * (x0 - xc) + yv * (y0 - yc) + zv * (z0 - zc)),
+            c = x0**2 + y0**2 + z0**2 + xc**2 + yc**2 + zc**2 -
+                - 2 * (x0 * xc + y0 * yc + z0 * zc) - r**2.
+
+        Подставив найденные значения параметра t
+        в параметрическое представление прямой,
+        получим координаты точек пересечения:
+
+        x1 = x0 + t1 * vx
+        y1 = y0 + t1 * vy
+        z1 = z0 + t1 * vz
+
+        x2 = x0 + t2 * vx
+        y2 = y0 + t2 * vy
+        z2 = z0 + t2 * vz
+
+        Таким образом, для определения координат точек пересечения
+        сферы и вектора необходимо решить квадратное уравнение
+        относительно параметра t и подставить найденные значения
+        параметра в параметрическое представление прямой.
         """
-        pass
+        a = v * v
+        b = 2 * v * Vector(pt_begin - self.pos)
+        c = Vector(self.pos) * Vector(self.pos) + \
+            Vector(pt_begin) * Vector(pt_begin) \
+            - 2 * Vector(self.pos) * Vector(pt_begin) - self.r ** 2
+        
+        d = b ** 2 - 4 * a * c
+        if d > 0:
+            t1 = (-b + math.sqrt(d)) / (2 * a)
+            t2 = (-b - math.sqrt(d)) / (2 * a)
+            # Смотрим пересечения с поверхностью сферы
+            if 0 <= t1 <= 1:
+                return v.point * t1 + pt_begin
+            elif 0 <= t2 <= 1:
+                return v.point * t2 + pt_begin
+            
+            # Если вектор лежит внутри сферы
+            if (0 <= t1) != (0 <= t2) and (t1 <= 1) != (t2 <= 1):
+                # Вектор, соединяющий точку центра
+                # и точку начала вектора v
+                v_tmp = Vector(self.pos - pt_begin)
+                # Проекция вектора v_temp на вектор V
+                projection = v * v_tmp / v_tmp.len()
+                # Возвращаем координаты точки, ближайшей к центру
+                if 0 <= projection <= 1:
+                    return projection * v.point + pt_begin
+                elif projection > 1:
+                    return v.point
+                else:
+                    return pt_begin
+        
+        elif d == 0:
+            t0 = -b / (2 * a)
+            if 0 <= t0 <= 1:
+                return v.point * t0 + pt_begin
+        
+        return Vector.vs.init_pt
     
-    def nearest_point(self, *pts: list[Point]) -> Point:
-        """We can live"""
+    def nearest_point(self, *pts: Point) -> Point:
+        r_min = 10 ** 9
+        min_pt = Vector.vs.init_pt
+        for pt in pts:
+            r = self.pos.distance(pt)
+            if r < r_min:
+                r_min = r
+                min_pt = pt
+        
+        return min_pt
         
         
 class Cube(Object):
     """
     y = centr.y + params.delta_y
-    
+
     {(centr.x + delta_x) + (centr.z + delta_z) = -y;
      centr.x - delta_x <= pt.x <= centr.x + delta_x
-     }
+    }
     Или
-    
+
     Уравнение грани (определитель)
-     | (x - centr.x) (y - centr.y + delta_y) (z - centr.z) |
-     | delta_x       0                       0             |
-     | 0             0                       delta_z       |
-     
+    | (x - centr.x) (y - centr.y + delta_y) (z - centr.z) |
+    | delta_x       0                       0             |
+    | 0             0                       delta_z       |
+
     Ограничения плоскости (расположения точки)
     centr.x - delta_x <= pt.x <= centr.x + delta_x
-    
+
     6 ограниченных плоскостей
     """
-    def contains(self, pt: Point) -> bool:
-        """
+    def __init__(self, pos: Point, rotation: Vector, **params):
+        super().__init__(pos, rotation, **params)
+        # Ограничения размеров куба (половина длина ребра)
+        self.limit = self.rot.len()
         
-        :param pt:
-        :return:
-        """
-        pass
+        # Ещё два ортогональных вектора из центра куба длины self.limit
+        a, b, _ = self.rot.point.coords
+        self.rot2 = Vector(b, -a, 0).norm() * self.limit
+        self.rot3 = self.rot2 ** self.rot
+        self.rot3 = self.rot3.norm() * self.limit
+        
+        # Создание граней куба
+        self.edges = []
+        for v in self.rot, self.rot2, self.rot3:
+            self.edges.append(BoundedPlane(v.point + self.pos, v,
+                                           dv1=self.limit,
+                                           dv2=self.limit))
+            self.edges.append(BoundedPlane(-1 * v.point + self.pos,
+                                           -1 * v, dv1=self.limit,
+                                           dv2=self.limit))
+    
+    def contains(self, pt: Point) -> bool:
+        # Радиус-вектор из центра куба к точке
+        v_tmp = Vector(pt - self.pos)
+        # Проекции вектора v_tmp на направляющие вектора куба
+        rot1_pr = self.rot * v_tmp / v_tmp.len()
+        rot2_pr = self.rot2 * v_tmp / v_tmp.len()
+        rot3_pr = self.rot3 * v_tmp / v_tmp.len()
+        return all(abs(pr) <= 1 for pr in (rot1_pr, rot2_pr, rot3_pr))
     
     def intersect(self, v: Vector, pt_begin: Point) -> Point:
         """
@@ -574,23 +688,3 @@ class Cube(Object):
         :return:
         """
         pass
-
-
-if __name__ == "__main__":
-    vs = VectorSpace()
-    Vector.vs = vs  # Передача векторного пространства в классы
-    p1 = Point(1, 2, 3)
-    p2 = Point(3, 2, 1)
-    v1 = Vector(p1)
-    v2 = Vector(p2)
-    # print(v1 ** v2)
-    # print(v1.len())
-    
-    pln = Plane(Point(1, 1, 1), Vector(1, 0, 0))
-    print(pln.contains(p1))
-    """
-    2y - z = 11
-    x = any
-    y = (11 + z) / 2
-    
-    """

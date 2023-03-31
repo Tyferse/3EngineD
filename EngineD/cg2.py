@@ -1,5 +1,6 @@
 import configparser
 import math
+import sys
 from abc import abstractmethod
 
 
@@ -479,7 +480,57 @@ class BoundedPlane(Plane):
         return Vector.vs.init_pt
 
     def nearest_point(self, *pts: Point) -> Point:
-        """I just go out through the window"""
+        """
+        Строим два перпендикуляра от точки к плоскости,
+         и от этого перпендикуляра до ребра плоскости.
+        Если ближайшая точка на плоскости - вершина,
+        то строим три перпендикуляра, первый к плоскости,
+        второй от первого к первой границе
+        (продолжению прямой, содержащей границу плоскости),
+        третий - от второго  перпендикуляра до второй границы плоскости.
+        
+        :param pts:
+        :return:
+        """
+        r_min = sys.maxsize
+        min_pt = Vector.vs.init_pt
+        r = 0
+        for pt in pts:
+            r_begin = Vector(pt - self.pos)
+            # Если начало вектора совпадает с центром плоскости
+            if r_begin.len() == 0:
+                return pt
+
+            projection1 = r_begin * self.rot / r_begin.len()
+            projection2 = r_begin * self.v1 / r_begin.len()
+            projection3 = r_begin * self.v2 / r_begin.len()
+            sign = lambda x: 1 if x > 0 else -1
+            if abs(projection2) <= 1 and abs(projection3) <= 1:
+                r = projection1 * self.rot.len()
+            elif abs(projection2) > 1 and abs(projection3) > 1:
+                proj2 = projection2 - sign(projection2)
+                proj3 = projection3 - sign(projection3)
+                r = self.rot * -projection1 + self.v1 * proj2 \
+                    + self.v2 * proj3 + Vector(pt)
+                r = r.len()
+                
+            elif abs(projection2) > 1:
+                proj2 = projection2 - sign(projection2)
+                r = self.rot * -projection1 + self.v1 * proj2 \
+                    + Vector(pt)
+                r = r.len()
+                
+            elif abs(projection3) > 1:
+                proj3 = projection3 - sign(projection3)
+                r = self.rot * -projection1 + self.v2 * proj3 \
+                    + Vector(pt)
+                r = r.len()
+             
+            if r < r_min:
+                r_min = r
+                min_pt = pt
+        
+        return min_pt
 
 
 class Sphere(Object):

@@ -1344,6 +1344,9 @@ class Events:
         """
         try:
             for i in range(len(cls.evdata[ev])):
-                cls.evdata[ev][i](*args)
-        except KeyError:
+                called = cls.evdata[ev][i](*args)
+                if called is not None:
+                    return called
+        except Exception:
             print("Something went wrong.")
+            print(cls.evdata[ev])

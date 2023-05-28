@@ -291,13 +291,12 @@ class Camera:
         self.pos = position
         # self.look_at = look_at
         self.look_dir = look_dir.norm()
-        # Расстояние до проекции (вне зависимости от размеров экрана)
+        
         self.fov = (fov / 180 * math.pi) / 2
         self.vfov = self.fov / self.ratio
-        self.screen = BoundedPlane(self.pos + self.look_dir.point,
-                                   self.look_dir,
-                                   math.tan(self.fov),
-                                   math.tan(self.vfov))
+        self.screen = BoundedPlane(
+            self.pos + self.look_dir.point / math.tan(self.fov),
+            self.look_dir, math.tan(self.fov), math.tan(self.vfov))
         # print(self.screen.du, self.screen.dv, self.fov, self.vfov)
         
         """
@@ -338,29 +337,33 @@ class Camera:
         # t = -self.screen.dv
         # s = -self.screen.du
         # Создаём лучи к каждому пикселю
-        for i, t in enumerate(np.linspace(
-            -self.screen.du, self.screen.du, self.hight)):
+        for i, s in enumerate(np.linspace(
+            -self.screen.dv, self.screen.dv, self.hight)):
             rays.append([])
-            for s in np.linspace(-self.screen.dv, self.screen.dv,
+            for t in np.linspace(-self.screen.du, self.screen.du,
                                  self.width):
                 direction = Vector(self.screen.pos) \
                             + self.screen.v * s + self.screen.u * t
                 
-                # Корректируем соотношение сторон отображаемых объектов
-                # direction.point.coords[0] = \
-                #     direction.point.coords[0] * 2 - 1
-                # direction.point.coords[1] = \
-                #     direction.point.coords[1] * 2 - 1
-                
                 direction = direction - Vector(self.pos)
-                direction.point.coords[0] /= 14 / 24
-                rays[i].append(Ray(self.pos, direction))
+                direction.point.coords[1] /= 15 / 48
+                rays[i].append(Ray(self.pos, direction.norm()))
                 
                 # rays[i].append(Ray(
                 #     direction.point - self.look_dir.point,
                 #     self.look_dir))
-                # t += t_step
-                # s += s_step
+        
+        # for y in range(self.hight):
+        #     rays.append([])
+        #     for x in range(self.width):
+        #         screen_x = (2 * x / self.screen.du) - 1
+        #         screen_y = 1 - (2 * y / self.screen.dv)
+        #
+        #         direction = self.look_dir + (screen_x * self.screen.u)\
+        #             - (screen_y * self.screen.v) \
+        #             + Vector(self.screen.pos) - Vector(self.pos)
+        #
+        #         rays[y].append(Ray(self.pos, direction.norm()))
         
         return rays
     
@@ -635,43 +638,13 @@ class BoundedPlane(Plane):
         self.du = du
         self.dv = dv
         
-        """
-        Нахождения направляющих ортогональных векторов плоскости:
-
-        1. Выбираем произвольный вектор, лежащий в плоскости.
-           Например, можно взять вектор (1, 0, -A / C),
-           если C не равно 0.
-           Если C равно 0, то можно взять вектор (0, 1, -B / A),
-           если A не равно 0.
-
-        2. Находим векторное произведение вектора нормали
-           и произвольного вектора:
-
-           u = (B, -A, 0)
-           v = (A * C, -C * B, -A^2 - B^2)
-
-        3. Нормализуем полученные векторы:
-
-           u_norm = u / |v1|
-           v_norm = v / |v2|
-
-        4. Получаем направляющие ортогональные векторы плоскости:
-
-           n1 = u_norm
-           n2 = n1 x n
-           где x - векторное произведение векторов.
-        """
+        y_dir = Vector.vs.basis[1]
+        if self.rot.point == y_dir.point \
+            or self.rot.point == -1 * y_dir.point:
+            y_dir = Vector.vs.basis[0]
         
-        x_dir = Vector.vs.basis[0]
-        if self.rot.point == x_dir.point \
-            or self.rot.point == -1 * x_dir.point:
-            x_dir = Vector.vs.basis[1]
-        
-        # if self.rot.point == x_dir.point:
-        #     x_dir = Vector.vs.basis[2]
-        
-        self.u = (x_dir ** self.rot).norm()
-        self.v = (self.u ** self.rot).norm()
+        self.u = (self.rot ** y_dir).norm()
+        self.v = (self.rot ** self.u).norm()
         
         self.pr = BoundedPlaneParams(self.pos, self.rot,
                                      self.u, self.v, self.du, self.dv)

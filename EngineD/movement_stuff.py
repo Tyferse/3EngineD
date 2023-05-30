@@ -83,7 +83,7 @@ class Player(Camera):
     """
 
 
-def lunch(console: Console, camera_type: str = 'spectator',
+def launch(console: Console, camera_type: str = 'spectator',
           sensitivity=1, move_speed=1):
     """
     Функция, запускающая бесконечный цикл,

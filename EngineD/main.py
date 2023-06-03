@@ -1,17 +1,13 @@
-# This is a sample Python script.
-
-# Press Shift+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files,
-# tool windows, actions, and settings.
+from movement import *
 
 
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Ctrl+F8 to toggle the breakpoint.
+cam = Camera(Point(-2, 0, 0), Vector(1, 0, 0), 90, 20)
 
+map1 = Map()
+map1.append(Sphere(Point(1, 0.5, 0), Vector(0, 0, 1), 0.8))
+map1.append(Sphere(Point(1, 0.5, -2), Vector(0, 10, 0), 0.8))
+map1.append(Sphere(Point(1, 0.5, -4), Vector(0, 1, 0), 0.8))
 
-# Press the green button in the gutter to run the script.
-if __name__ == '__main__':
-    print_hi('PyCharm')
+cons = Console(map1, cam)
 
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+launch(cons, move_speed=0.25, sensitivity=2)

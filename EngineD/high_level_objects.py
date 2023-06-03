@@ -56,8 +56,8 @@ class BoundedPlaneParams(Parameters):
         self.dv = dv
     
     def scaling(self, value):
-        self.du = self.du * value
-        self.dv = self.dv * value
+        self.du *= value
+        self.dv *= value
     
     def rotate(self, x_angle=0, y_angle=0, z_angle=0):
         self.rot.rotate(x_angle, y_angle, z_angle)
@@ -85,8 +85,8 @@ class CubeParams(Parameters):
     def move(self, move_to: Point):
         self.pos = self.pos + move_to
         
-        for edge in self.edges:
-            edge.pos = edge.pos + move_to
+        for i in range(len(self.edges)):
+            self.edges[i].pos = self.edges[i].pos + move_to
     
     def scaling(self, value):
         self.rot = self.rot * value
@@ -95,14 +95,14 @@ class CubeParams(Parameters):
         rotations = [self.rot, self.rot2, self.rot3]
         self.limit *= value
         
-        for i, edge in enumerate(self.edges):
-            edge.pr.scaling(value)
+        for i in range(len(self.edges)):
+            self.edges.pr.scaling(value)
             if i % 2 == 0:
-                edge.pr.pos = self.pos + rotations[i // 2].point
-                edge._update()
+                self.edges[i].pr.pos = self.pos \
+                                       + rotations[i // 2].point
             else:
-                edge.pr.pos = self.pos - rotations[i // 2].point
-                edge._update()
+                self.edges[i].pr.pos = self.pos \
+                                       - rotations[i // 2].point
     
     def rotate(self, x_angle=0, y_angle=0, z_angle=0):
         self.rot.rotate(x_angle, y_angle, z_angle)
@@ -110,14 +110,15 @@ class CubeParams(Parameters):
         self.rot3.rotate(x_angle, y_angle, z_angle)
         
         rotations = [self.rot, self.rot2, self.rot3]
-        for i, edge in enumerate(self.edges):
+        for i in range(len(self.edges)):
+            self.edges[i].pr.rotate(x_angle, y_angle, z_angle)
             if i % 2 == 0:
-                edge.pr.pos = self.pos + rotations[i // 2].point
+                self.edges[i].pr.pos = self.pos \
+                                       + rotations[i // 2].point
             else:
-                edge.pr.pos = self.pos - rotations[i // 2].point
+                self.edges[i].pr.pos = self.pos \
+                                       - rotations[i // 2].point
             
-            edge.pr.rotate(x_angle, y_angle, z_angle)
-
 
 # ______________________________________________________________________
 class Plane(Object):
@@ -528,22 +529,22 @@ class Cube(Object):
         self.rot = rotation.norm() * self.limit
         
         # Ещё два ортогональных вектора из центра куба длины self.limit
-        x_dir = Vector.vs.basis[0]
-        if self.rot.point == x_dir.point \
-            or self.rot.point == -1 * x_dir.point:
-            x_dir = Vector.vs.basis[1]
+        y_dir = Vector.vs.basis[1]
+        if self.rot.point == y_dir.point \
+           or self.rot.point == -1 * y_dir.point:
+            y_dir = Vector.vs.basis[0]
         
-        self.rot2 = (x_dir ** self.rot).norm() * self.limit
-        self.rot3 = (self.rot2 ** self.rot).norm() * self.limit
+        self.rot2 = (self.rot ** y_dir).norm() * self.limit
+        self.rot3 = (self.rot ** self.rot2).norm() * self.limit
         
         # Создание граней куба
         self.edges = []
         for v in self.rot, self.rot2, self.rot3:
-            self.edges.append(BoundedPlane(v.point + self.pos, v,
+            self.edges.append(BoundedPlane(self.pos + v.point, v,
                                            du=self.limit,
                                            dv=self.limit))
-            self.edges.append(BoundedPlane(-1 * v.point + self.pos,
-                                           -1 * v, du=self.limit,
+            self.edges.append(BoundedPlane(self.pos - v.point, -1 * v,
+                                           du=self.limit,
                                            dv=self.limit))
         
         self.pr = CubeParams(self.pos, self.limit,
@@ -560,11 +561,13 @@ class Cube(Object):
     
     def __str__(self):
         self._update()
+        
         s = ", ".join(map(str, [self.rot, self.rot2, self.rot3]))
         return f'Cube({self.pos}, ({s}), limit={self.limit:.4f})'
     
     def contains(self, pt: Point, eps=1e-6) -> bool:
         self._update()
+        
         # Радиус-вектор из центра куба к точке
         v_tmp = Vector(pt - self.pos)
         # Если точка является центром куба
@@ -591,6 +594,8 @@ class Cube(Object):
             return min(int_pts)
     
     def nearest_point(self, *pts: Point) -> Point:
+        self._update()
+        
         r_min = sys.maxsize
         min_pt = Vector.vs.init_pt
         r = 0

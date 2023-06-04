@@ -96,7 +96,7 @@ class CubeParams(Parameters):
         self.limit *= value
         
         for i in range(len(self.edges)):
-            self.edges.pr.scaling(value)
+            self.edges[i].pr.scaling(value)
             if i % 2 == 0:
                 self.edges[i].pr.pos = self.pos \
                                        + rotations[i // 2].point
@@ -109,15 +109,17 @@ class CubeParams(Parameters):
         self.rot2.rotate(x_angle, y_angle, z_angle)
         self.rot3.rotate(x_angle, y_angle, z_angle)
         
-        rotations = [self.rot, self.rot2, self.rot3]
+        # rotations = [self.rot, self.rot2, self.rot3]
         for i in range(len(self.edges)):
             self.edges[i].pr.rotate(x_angle, y_angle, z_angle)
             if i % 2 == 0:
                 self.edges[i].pr.pos = self.pos \
-                                       + rotations[i // 2].point
+                                       + self.edges[i].pr.rot.point
             else:
                 self.edges[i].pr.pos = self.pos \
-                                       - rotations[i // 2].point
+                                       + self.edges[i].pr.rot.point
+            
+            self.edges[i]._update()
             
 
 # ______________________________________________________________________

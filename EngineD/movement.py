@@ -37,6 +37,10 @@ class Events:
     
     @classmethod
     def remove(cls, ev: str, func: type(add)):
+        if len(cls.evdata[ev]) < 2:
+            del cls.evdata[ev]
+            return
+            
         for i in range(len(cls.evdata[ev])):
             if cls.evdata[ev][i] is func:
                 del cls.evdata[ev][i]
@@ -175,6 +179,8 @@ def launch(console: Console, camera_type: str = 'spectator',
     :param move_speed: скорость перемещения
     """
     assert camera_type in ('spectator', 'player')
+    
+    is_alive = True
     if camera_type == 'spectator':
         tmp = console.cam
         console.cam = Spectator(tmp.pos, tmp.look_dir,
@@ -182,7 +188,9 @@ def launch(console: Console, camera_type: str = 'spectator',
         del tmp
         
         def close_console():
-            raise SystemExit("Work was stopped with exit code 1")
+            nonlocal is_alive
+            is_alive = False
+            print("Work was stopped with exit code 1")
         
         def mv1(action: str):
             console.cam = Events.trigger(action,
@@ -200,7 +208,7 @@ def launch(console: Console, camera_type: str = 'spectator',
         pag.moveTo(pag.size()[0] // 2, pag.size()[1] // 2)
         pag.click()
         curr_pos = pag.position()
-        while True:
+        while is_alive:
             something_happened = False
             new_pos = pag.position()
             if new_pos != curr_pos:

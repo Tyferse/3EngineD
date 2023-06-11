@@ -4,6 +4,8 @@ import pyautogui as pag
 from visualization import *
 
 
+pag.FAILSAFE = False
+
 class Events:
     """
     Стек событий

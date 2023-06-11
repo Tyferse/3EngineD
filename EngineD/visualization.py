@@ -51,7 +51,7 @@ class Camera:
                             + self.screen.v * s + self.screen.u * t
                 
                 direction = direction - Vector(self.pos)
-                direction.point.coords[1] /= 15 / 48
+                direction.point.coords[1] /= 14 / 48
                 rays[i].append(Ray(self.pos, direction.norm()))
         
         return rays

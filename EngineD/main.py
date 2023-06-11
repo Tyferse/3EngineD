@@ -12,6 +12,5 @@ map1.append(Cube(Point(2, 0, 0), Vector(1, 0, 0), 1/2))
 cons = Console(map1, cam)
 
 #cons.map[0].pr.scaling(2)
-print(*cons.map[0].edges, sep='\n')
 
 launch(cons, move_speed=0.25, sensitivity=2)

@@ -15,12 +15,13 @@ class Camera:
     def __init__(self, position: Point, look_dir: Vector,
                  fov, draw_dist):
         """
-
-        :param position: Расположение.
-        :param look_dir: Направление камеры (Vector).
-        :param fov: Горизонтальный угол обзора.
-        vfov = fov * H / W - вертикальный угол обзора
-        :param draw_dist: Дистанция прорисовки.
+        Камера, от лица которой отображаются объекты на карте.
+        
+        Args:
+            position (Point): Точка положения камеры в пространстве.
+            look_dir (Vector): Вектор направления взгляда камеры.
+            fov (float | int): Горизонтальный угол обзора (в градусах).
+            draw_dist (float): Максимальное расстояние прорисовки.
         """
         self.pos = position
         self.look_dir = look_dir.norm()
@@ -29,7 +30,8 @@ class Camera:
         self.vfov = self.fov / ratio
         self.screen = BoundedPlane(
             self.pos + self.look_dir.point / math.tan(self.fov),
-            self.look_dir, math.tan(self.fov), math.tan(self.vfov))
+            self.look_dir, math.tan(self.fov), math.tan(self.vfov)
+        )
         
         """
         Видимость ограничена сферой с длиной радиуса Draw_distance
@@ -39,6 +41,13 @@ class Camera:
         self.draw_dist = draw_dist
     
     def send_rays(self) -> list[list[Ray]]:
+        """
+        Отправка лучей от центра камеры на плоскость экрана.
+        
+        Returns:
+            list[list[Ray]]: Матрица (список списков) лучей, направленных
+                в каждый "символ", отображаемый на экране.
+        """
         # Считаем расстояние от камеры до пересечения луча с объектами
         rays = []
         # Создаём лучи к каждому пикселю
@@ -69,18 +78,29 @@ symbols = " .:!/r(l1Z4H9W8$@"
 
 class Canvas:
     def __init__(self, objmap: Map, camera: Camera):
+        """
+        Холст с камерой, расположенной на карте.
+        
+        Args:
+            objmap (Map): Карта объектов.
+            camera (Camera): Камера.
+        """
         self.map = objmap
         self.cam = camera
     
     def update(self):
+        """
+        Обновляет отображение объектов на экране.
+        
+        Returns:
+            list[]: Матрица расстояний в направлении каждого символа на экране
+                от центра камеры до какого-либо из объектов на карте.
+        """
         rays = self.cam.send_rays()
         dist_matrix = []
         for i in range(hight):
             dist_matrix.append([])
             for j in range(width):
-                # rays[i][j].dir /= ((rays[i][j].dir * self.cam.look_dir)
-                #                    / rays[hight // 2][j].dir.len() ** 2)
-                
                 distances = rays[i][j].intersect(self.map)
                 if all(d is None or d > self.cam.draw_dist
                        for d in distances):
@@ -93,7 +113,14 @@ class Canvas:
 
 
 class Console(Canvas):
+    """Консоль, в которой отрисовывается карта от лица камеры."""
     def draw(self):
+        """
+        Вывод в консоль экрана в виде символов, основанная на матрице расстояний
+        от камеры до объектов в области видимости.
+        """
+        global symbols
+        
         dist_matrix = self.update()
         output_screen = ''
         for y in range(len(dist_matrix)):
@@ -103,14 +130,13 @@ class Console(Canvas):
                     continue
                 
                 try:
-                    gradient = dist_matrix[y][x] / self.cam.draw_dist \
-                               * (len(symbols) - 1)
+                    gradient = (dist_matrix[y][x] / self.cam.draw_dist
+                                * (len(symbols) - 1))
                     
-                    output_screen += symbols[len(symbols)
-                                             - round(gradient) - 1]
+                    output_screen += symbols[len(symbols) - round(gradient) - 1]
                 except (IndexError, TypeError):
-                    print(len(symbols) * dist_matrix[y][x]
-                          / self.cam.draw_dist, dist_matrix[y][x])
+                    print(len(symbols) * dist_matrix[y][x] / self.cam.draw_dist,
+                          dist_matrix[y][x])
                     raise
             
             output_screen += '\n'

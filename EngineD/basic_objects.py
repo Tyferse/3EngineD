@@ -2,6 +2,11 @@ import math
 
 
 class Point:
+    """
+    Класс точки в трёхмерном пространстве с операциями сложения, сравнения точек,
+    нахождение расстояния между двумя точками (метод distance),
+    умножения и деления на константу.
+    """
     def __init__(self, x, y, z):
         self.coords = [x, y, z]
     
@@ -23,9 +28,7 @@ class Point:
     
     def __mul__(self, other):
         assert isinstance(other, (int, float))
-        
-        return Point(*[self.coords[i] * other
-                       for i in range(3)])
+        return Point(*[self.coords[i] * other for i in range(3)])
     
     def __sub__(self, other):
         return self.__add__(-1 * other)
@@ -38,22 +41,31 @@ class Point:
         return self.__mul__(1 / other)
     
     def distance(self, pt):
-        return math.sqrt(sum((self.coords[i] - pt.coords[i]) ** 2
-                             for i in range(3)))
+        return math.sqrt(sum((self.coords[i] - pt.coords[i])**2 for i in range(3)))
 
 
 class Vector:
-    # vs = VectorSpace()
+    """
+    Класс свободного вектора (радиус-вектора) в трёхмерном пространстве
+    c операциями получения длины (расстояния от точки начала координат),
+    нормирования, сложения с другим вектором и умножения на константу,
+    скалярного и векторного произведения,
+    вращения (относительно точки начала координат).
+    """
     def __init__(self, *args):
         if len(args) == 1:
-            assert isinstance(args[0], Point)
-            self.point = args[0]  # Point(x, y, z)
+            assert isinstance(args[0], Point), ("1 argument must be Point, "
+                                                f"got {type(args[0])} instead")
+            self.point = args[0]
         elif len(args) == 3:
-            assert all(map(isinstance, args, [(int, float)] * 3))
+            assert all(map(isinstance, args, [(int, float)] * 3)), \
+                ("3 arguments must be numbers, "
+                 f"got {''.join(type(args[i]) for i in range(3))}")
             self.point = Point(*args)
+        else:
+            raise TypeError("expected 1 Point argument or 3 numeric argument, "
+                            f"got {len(args)} arguments")
         
-        # self.vs = vs
-    
     def __str__(self):
         return "Vector({:.4f}, {:.4f}, {:.4f})".format(
             *self.point.coords)
@@ -83,9 +95,7 @@ class Vector:
         return Vector(self.point - other.point)
     
     def __mul__(self, other):
-        """
-        Умножение на число, скалярное произведение векторов.
-        """
+        """Умножение на число, скалярное произведение векторов."""
         if isinstance(other, Vector):
             return sum(self.point.coords[i] * other.point.coords[i]
                        for i in range(3))
@@ -103,9 +113,7 @@ class Vector:
         return Vector(self.point / other)
     
     def __pow__(self, other):
-        """
-        Векторное произведение.
-        """
+        """Векторное произведение."""
         x1 = self.point.coords[0]
         y1 = self.point.coords[1]
         z1 = self.point.coords[2]
@@ -119,8 +127,7 @@ class Vector:
         
         return x + y + z
     
-    def rotate(self, x_angle: float = 0, y_angle: float = 0,
-               z_angle: float = 0):
+    def rotate(self, x_angle: float = 0, y_angle: float = 0, z_angle: float = 0):
         x_angle = math.pi * x_angle / 360
         y_angle = math.pi * y_angle / 360
         z_angle = math.pi * z_angle / 360
@@ -151,6 +158,9 @@ class Vector:
 
 
 class VectorSpace:
+    """
+    Класс векторного пространства с точкой начала координат и базисными векторами.
+    """
     init_pt = Point(0, 0, 0)
     basis = [Vector(1, 0, 0), Vector(0, 1, 0), Vector(0, 0, 1)]
     
@@ -166,6 +176,7 @@ Vector.vs = VectorSpace()
 
 
 class Map:
+    """Класс карты, на которой располагаются все отображаемые объекты."""
     def __init__(self, *args):
         self._obj_list = [*args]
     
@@ -180,6 +191,7 @@ class Map:
 
 
 class Ray:
+    """Класс луча с точкой начала и направляющим вектором"""
     def __init__(self, ipt: Point, direction: Vector):
         self.inpt = ipt
         self.dir = direction
@@ -188,4 +200,14 @@ class Ray:
         return f"Ray({self.inpt}, {self.dir})"
     
     def intersect(self, mapping: Map) -> list[float]:
+        """
+        Вычисляет расстояния до пересечения луча со всеми объектами на карте mapping.
+        
+        Args:
+            mapping (Map): Карта с объектами.
+
+        Returns:
+            list[float]: Список расстояний до пересечения луча
+            с каждым объектом на карте.
+        """
         return [objt.intersect(self) for objt in mapping]

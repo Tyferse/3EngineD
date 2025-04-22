@@ -5,50 +5,106 @@ from basic_objects import *
 
 
 class Object:
+    """
+    Базовый класс объекта в трёхмерном пространстве с точкой расположения (центра),
+    вектором вращения (направления), операциями проверки точки
+    на принадлежность внутренности (или поверхности) объекта,
+    нахождения ближайшей точки пересечения луча с поверхностью,
+    возврат точки, ближайшей к поверхности объекта.
+    """
     def __init__(self, pos: Point, rotation: Vector):
         self.pos = pos
         self.rot = rotation
     
     @abstractmethod
     def contains(self, pt: Point, eps=1e-6) -> bool:
+        """
+        Проверка на принадлежность точки поверхности или внутренности объекта.
+        
+        Args:
+            pt (Point): Точка, которая проверяется на принадлежность.
+            eps (float): Максимальная ошибка округления (если расстояния
+                от точки до объекта меньше eps, то вернёт True).
+
+        Returns:
+            bool: True, если точка pt принадлежит объекту, иначе False.
+        """
         return False
     
     @abstractmethod
-    def intersect(self, ray: Ray) -> float or None:
+    def intersect(self, ray: Ray) -> float | None:
         """
-        Точка пересечения или выходящая за
-        поле видимости (дальности прорисовки) (draw_distance)
+        Наименьшее расстояние до точки пересечения луча с поверхностью объекта.
+        
+        Args:
+            ray (Ray): Луч, для которого вычисляется пересечение с объектом.
 
-        :param ray:
-        :return:
+        Returns:
+            float: Наименьшее расстояние до поверхности объекта.
+                Если нет пересечения с объектом, вернёт расстояние
+                до границы области видимости камеры.
         """
         return None
     
     @abstractmethod
     def nearest_point(self, *pts: list[Point]) -> Point:
+        """
+        Возвращает ближайшую к объекту точку.
+        
+        Args:
+            *pts (list[Point]): Список точек.
+
+        Returns:
+            Point: Точка, от которой наименьшее расстояние до объекта.
+
+        """
         pass
 
 
-# ______________________________________________________________________
+# Определение параметров объектов __________________________________________________
 class Parameters:
+    """
+    Класс параметров объекта с операциями перемещения, масштабирования и поворота
+    """
     def __init__(self, pos: Point, rotation: Vector):
         self.pos = pos
         self.rot = rotation
     
     def move(self, move_to: Point):
+        """
+        Перемещает центр объекта покоординатно.
+        
+        Args:
+            move_to (Point): Точка, на координаты которой надо изменить
+                позицию объекта.
+        """
         self.pos = self.pos + move_to
     
-    def scaling(self, value):
+    def scaling(self, value: float | int):
+        """
+        Масштабирование объекта.
+        
+        Args:
+            value (float | int): Масштабирующая константа, которая изменит
+                размеры объекта.
+        """
         pass
     
-    def rotate(self, x_angle: float = 0, y_angle: float = 0,
-               z_angle: float = 0):
+    def rotate(self, x_angle: float = 0, y_angle: float = 0, z_angle: float = 0):
+        """
+        Вращение объекта вокруг осей на передаваемые углы (в радианах).
+        
+        Args:
+            x_angle: Угол поворота вокруг оси OX
+            y_angle: Угол поворота вокруг оси OY
+            z_angle: Угол поворота вокруг оси OZ
+        """
         self.rot.rotate(x_angle, y_angle, z_angle)
 
 
 class BoundedPlaneParams(Parameters):
-    def __init__(self, pos: Point, rotation: Vector,
-                 u, v, du, dv):
+    """Параметры ограниченной плоскости."""
+    def __init__(self, pos: Point, rotation: Vector, u, v, du, dv):
         super().__init__(pos, rotation)
         self.u = u
         self.v = v
@@ -75,6 +131,7 @@ class SphereParams(Parameters):
 
 
 class CubeParams(Parameters):
+    """Параметры куба"""
     def __init__(self, pos: Point, limit, rotations: [Vector],
                  edges: '[BoundedPlane]'):
         super().__init__(pos, rotations[0])
@@ -98,52 +155,40 @@ class CubeParams(Parameters):
         for i in range(len(self.edges)):
             self.edges[i].pr.scaling(value)
             if i % 2 == 0:
-                self.edges[i].pr.pos = self.pos \
-                                       + rotations[i // 2].point
+                self.edges[i].pr.pos = self.pos + rotations[i // 2].point
             else:
-                self.edges[i].pr.pos = self.pos \
-                                       - rotations[i // 2].point
+                self.edges[i].pr.pos = self.pos - rotations[i // 2].point
     
     def rotate(self, x_angle=0, y_angle=0, z_angle=0):
         self.rot.rotate(x_angle, y_angle, z_angle)
         self.rot2.rotate(x_angle, y_angle, z_angle)
         self.rot3.rotate(x_angle, y_angle, z_angle)
         
-        # rotations = [self.rot, self.rot2, self.rot3]
         for i in range(len(self.edges)):
             self.edges[i].pr.rotate(x_angle, y_angle, z_angle)
             if i % 2 == 0:
-                self.edges[i].pr.pos = self.pos \
-                                       + self.edges[i].pr.rot.point
+                self.edges[i].pr.pos = self.pos + self.edges[i].pr.rot.point
             else:
-                self.edges[i].pr.pos = self.pos \
-                                       + self.edges[i].pr.rot.point
+                self.edges[i].pr.pos = self.pos + self.edges[i].pr.rot.point
             
             self.edges[i]._update()
             
 
-# ______________________________________________________________________
+# Определение объектов _____________________________________________________________
 class Plane(Object):
-    """
-    Плоскость
-
-    Параметрическое уравнение плоскости
-    {
-     x = a * t + b * s + c
-     y = f * t + g * s + h
-     z = p * t + q * s + v
-    }
-
-    a, b, f, g, p, q - координаты двух направляющих векторов
-    c, h, v - координаты точки, принадлежащей плоскости
-    t, s - параметры
-    """
-    
     def __init__(self, position, rotation):
+        """
+        Плоскость без границ.
+        
+        Args:
+            position (Point): Точка, принадлежащая плоскости.
+            rotation (Vector): Вектор нормали к плоскости.
+        """
         super().__init__(position, rotation)
         self.pr = Parameters(self.pos, self.rot)
     
     def _update(self):
+        """Обновление текущих позиции и направления."""
         self.pos = self.pr.pos
         self.rot = self.pr.rot
     
@@ -152,83 +197,20 @@ class Plane(Object):
         return f'Plane({self.pos}, {str(self.rot)})'
     
     def contains(self, pt: Point, eps=1e-6) -> bool:
-        # return sum(self.rot.point.coords[i] *
-        #            (pt.coords[i] - self.pos.coords[i])
-        #            for i in range(3)) == 0
         self._update()
         return abs(self.rot * Vector(pt - self.pos)) < eps
     
     def intersect(self, ray: Ray) -> float:
-        """
-        Скалярное произведение вектора нормали к плоскости и вектора v
-        не равно нулю и вектор v не лежит на плоскости, то вектор v
-        не пересекает плоскость.
-
-        Если координаты вектора v соответствуют уравнению плоскости,
-        то этот вектор лежит на плоскости.
-
-        Иначе, если скалярное произведение вектора нормали к плоскости
-        и вектора v равно нулю и вектор v не лежит на плоскости,
-        то этот вектор параллелен ей и не пересекает её
-        ни в какой точке.
-
-        :param ray:
-        :return: Точка пересечения или точка,
-                 ближайшая к центру плоскости.
-        """
         self._update()
-        if self.rot * ray.dir != 0 and not (self.contains(ray.inpt)
-                                            and self.contains(
-                ray.dir.point)):
-            """
-            Параметрическое уравнение прямой, на которой лежит вектор v:
-            x = v.point.coords[0] * t0 + pt_begin.coords[0]
-            y = v.point.coords[1] * t0 + pt_begin.coords[1]
-            z = v.point.coords[2] * t0 - pt_begin.coords[2]
-
-            Подставляем параметрические значения в уравнение плоскости:
-            self.rot.point.coords[0] * (v.point.coords[0] * t0
-                + pt_begin.coords[0] - self.pos.coords[0]) +
-            self.rot.point.coords[1] * (v.point.coords[1] * t0
-                + pt_begin.coords[1] - self.pos.coords[1]) +
-            self.rot.point.coords[2] * (v.point.coords[2] * t0
-                + pt_begin.coords[2] - self.pos.coords[2]) = 0
-
-            Ищем параметр t0:
-            xi, yi, zi - координаты начальной точки
-            xv, yv, zv - координаты вектора v
-            xс, yс, zс - координаты точки центра плоскости
-            A, B, C - координаты вектора нормали к плоскости
-
-            A * xv * t0 - A * xс + A * xi +
-            B * yv * t0 - B * yс + B * yi +
-            C * zv * t0 - C * zс + C * zi = 0
-
-            t0 * (A * xv + B * yv + C * zv) = A * xс + B * yс + C * zс
-                                            - A * xi - B * yi - C * zi
-
-            t0 = (A * xс + B * yс * C * zс - A * xi - B * yi - C * zi) /
-                 (A * xv + B * yv + C * zv)
-
-            t0 = (self.rot * self.pos - self.rot * Vector(pt_begin)) /
-                 (self.rot * v)
-
-            Подставляем значение параметра в параметрическое
-            уравнение прямой и находим координаты точки пересечения:
-            Q = self.rot.point * t0 - vs.init_pt
-            Q(self.rot.point.coords[0] * t0 - 0,
-              self.rot.point.coords[1] * t0 - 0,
-              self.rot.point.coords[2] * t0 - 0) - точка пересечения
-            """
-            t0 = (self.rot * Vector(self.pos) -
-                  self.rot * Vector(ray.inpt)) / (self.rot * ray.dir)
+        if (self.rot * ray.dir != 0
+           and not (self.contains(ray.inpt) and self.contains(ray.dir.point))):
+            t0 = ((self.rot * Vector(self.pos) - self.rot * Vector(ray.inpt))
+                  / (self.rot * ray.dir))
             if t0 >= 0:
                 return t0 * ray.dir.len()
         
         elif self.contains(ray.inpt):
-            """
-            Возвращаем ноль, потому что
-            """
+            # Возвращаем ноль, потому что точка начала луча уже принадлежит плоскости
             return 0
     
     def nearest_point(self, *pts: Point) -> Point:
@@ -250,16 +232,23 @@ class Plane(Object):
 class BoundedPlane(Plane):
     def __init__(self, pos: Point, rotation: Vector, du, dv):
         """
-        Стандартная инициализация плоскости + поиск двух направляющих
-        и взаимно-ортогональных векторов плоскости.
+        Плоскость, ограниченная длиной и шириной по двум лежащим на ней векторам.
+        
+        Args:
+            pos (Point): Точка центра ограниченной плоскости, откуда исходят
+                направляющие вектора
+            rotation (Vector): Вектор нормали к плоскости.
+            du (float | int): Длина первого (вертикального) вектора плоскости,
+                отвечающего за длину.
+            dv (float | int): Длина второго (горизонтального) вектора плоскости,
+                отвечающего за ширину.
         """
         super().__init__(pos, rotation)
         self.du = du
         self.dv = dv
         
         y_dir = Vector.vs.basis[1]
-        if self.rot.point == y_dir.point \
-            or self.rot.point == -1 * y_dir.point:
+        if self.rot.point == y_dir.point or self.rot.point == -1 * y_dir.point:
             y_dir = Vector.vs.basis[0]
         
         self.u = (self.rot ** y_dir).norm()
@@ -360,8 +349,7 @@ class BoundedPlane(Plane):
                     ux = ray2.dir.point.coords[0]
                     uy = ray2.dir.point.coords[1]
                     
-                    t1 = ((x0 - xr) * vy / vx + yr - y0) \
-                         / (uy - ux * vy / vx)
+                    t1 = ((x0 - xr) * vy / vx + yr - y0) / (uy - ux * vy / vx)
                     s1 = (t1 * ux + x0 - xr) / vx
                     return t1, s1
                 
@@ -374,8 +362,8 @@ class BoundedPlane(Plane):
                     vy = ray1.dir.point.coords[1]
                     ux = ray2.dir.point.coords[0]
                     uy = ray2.dir.point.coords[1]
-                    t1 = ((y0 - yr) * vx / vy + xr - x0) \
-                         / (ux - uy * vx / vy)
+                    
+                    t1 = ((y0 - yr) * vx / vy + xr - x0) / (ux - uy * vx / vy)
                     s1 = (t0 * uy + y0 - yr) / vy
                     return t1, s1
                 
@@ -388,8 +376,8 @@ class BoundedPlane(Plane):
                     vy = ray1.dir.point.coords[1]
                     uz = ray2.dir.point.coords[2]
                     uy = ray2.dir.point.coords[1]
-                    t1 = ((z0 - zr) * vy / vz + yr - y0) / (
-                        uy - uz * vy / vz)
+                    
+                    t1 = ((z0 - zr) * vy / vz + yr - y0) / (uy - uz * vy / vz)
                     s1 = (t0 * uz + z0 - zr) / vz
                     return t1, s1
             
@@ -399,8 +387,9 @@ class BoundedPlane(Plane):
                 
                 sign = 1 if begin_pr1 > 0 else -1
                 t0, s0 = find_point(
-                    Ray(sign * self.du * self.u.point + self.pos,
-                        self.dv * self.v), ray)
+                    Ray(sign * self.du * self.u.point + self.pos, self.dv * self.v),
+                    ray
+                )
                 if s0 >= 0 and abs(t0) <= 1:
                     return s0 * ray.dir.len()
             
@@ -410,8 +399,9 @@ class BoundedPlane(Plane):
                 
                 sign = 1 if begin_pr2 > 0 else -1
                 t0, s0 = find_point(
-                    Ray(sign * self.dv * self.v.point + self.pos,
-                        self.du * self.u), ray)
+                    Ray(sign * self.dv * self.v.point + self.pos, self.du * self.u),
+                    ray
+                )
                 if s0 >= 0 and abs(t0) <= 1:
                     return s0 * ray.dir.len()
     
@@ -436,18 +426,16 @@ class BoundedPlane(Plane):
             elif abs(projection2) > 1 and abs(projection3) > 1:
                 proj2 = projection2 - sign(projection2)
                 proj3 = projection3 - sign(projection3)
-                r = self.rot * -projection1 + self.u * proj2 \
-                    + self.v * proj3 + Vector(pt)
+                r = (self.rot * -projection1 + self.u * proj2
+                     + self.v * proj3 + Vector(pt))
                 r = r.len()
             elif abs(projection2) > 1:
                 proj2 = projection2 - sign(projection2)
-                r = self.rot * -projection1 + self.u * proj2 \
-                    + Vector(pt)
+                r = self.rot * -projection1 + self.u * proj2 + Vector(pt)
                 r = r.len()
             elif abs(projection3) > 1:
                 proj3 = projection3 - sign(projection3)
-                r = self.rot * -projection1 + self.v * proj3 \
-                    + Vector(pt)
+                r = self.rot * -projection1 + self.v * proj3 + Vector(pt)
                 r = r.len()
             
             if r < r_min:
@@ -458,10 +446,17 @@ class BoundedPlane(Plane):
 
 
 class Sphere(Object):
-    def __init__(self, pos: Point, rotation: Vector, radius):
+    def __init__(self, pos: Point, rotation: Vector, radius: float | int):
+        """
+        Сфера с центром и радиусом.
+        
+        Args:
+            pos (Point): Точка центра.
+            rotation (Vector): Вектор направления (любой, так как сфера симметрична).
+            radius (float): Радиус сферы.
+        """
         super().__init__(pos, rotation)
-        self.pr = SphereParams(self.pos, self.rot.norm() * radius,
-                               radius)
+        self.pr = SphereParams(self.pos, self.rot.norm() * radius, radius)
     
     def _update(self):
         self.pos = self.pr.pos
@@ -473,13 +468,6 @@ class Sphere(Object):
         return f'Sphere({self.pos}, {str(self.rot)}, radius={self.r})'
     
     def contains(self, pt: Point, eps=1e-6) -> bool:
-        """
-        x**2 + y**2 + z**2 <= params.radius**2
-
-        :param pt:
-        :param eps:
-        :return:
-        """
         self._update()
         return self.pos.distance(pt) - self.r <= eps
     
@@ -525,6 +513,14 @@ class Sphere(Object):
 
 class Cube(Object):
     def __init__(self, pos: Point, rotation: Vector, size: float):
+        """
+        Куб с точкой центра и вектором направления.
+        
+        Args:
+            pos (Point): Точка центра.
+            rotation (Vector): Вектор направления.
+            size (float): Длина ребра куба.
+        """
         super().__init__(pos, rotation)
         # Ограничения размеров куба (половина длина ребра)
         self.limit = size / 2
@@ -543,15 +539,12 @@ class Cube(Object):
         self.edges = []
         for v in self.rot, self.rot2, self.rot3:
             self.edges.append(BoundedPlane(self.pos + v.point, v,
-                                           du=self.limit,
-                                           dv=self.limit))
+                                           du=self.limit, dv=self.limit))
             self.edges.append(BoundedPlane(self.pos - v.point, -1 * v,
-                                           du=self.limit,
-                                           dv=self.limit))
+                                           du=self.limit, dv=self.limit))
         
         self.pr = CubeParams(self.pos, self.limit,
-                             [self.rot, self.rot2, self.rot3],
-                             self.edges)
+                             [self.rot, self.rot2, self.rot3], self.edges)
     
     def _update(self):
         self.pos = self.pr.pos
@@ -580,8 +573,7 @@ class Cube(Object):
         rot1_pr = self.rot * v_tmp / v_tmp.len()
         rot2_pr = self.rot2 * v_tmp / v_tmp.len()
         rot3_pr = self.rot3 * v_tmp / v_tmp.len()
-        return all(abs(abs(pr) - 1) <= eps
-                   for pr in (rot1_pr, rot2_pr, rot3_pr))
+        return all(abs(abs(pr) - 1) <= eps for pr in (rot1_pr, rot2_pr, rot3_pr))
     
     def intersect(self, ray: Ray, eps=1e-6) -> float or None:
         self._update()
@@ -620,19 +612,18 @@ class Cube(Object):
             elif abs(projection2) > 1 and abs(projection3) > 1:
                 proj2 = projection2 - sign(projection2)
                 proj3 = projection3 - sign(projection3)
-                r = self.edges[i].rot * -projection1 \
-                    + self.edges[i].u * proj2 \
-                    + self.edges[i].v * proj3 + Vector(near_pt)
+                r = (self.edges[i].rot * -projection1 + self.edges[i].u * proj2
+                     + self.edges[i].v * proj3 + Vector(near_pt))
                 r = r.len()
             elif abs(projection2) > 1:
                 proj2 = projection2 - sign(projection2)
-                r = self.edges[i].rot * -projection1 \
-                    + self.edges[i].u * proj2 + Vector(near_pt)
+                r = (self.edges[i].rot * -projection1 + self.edges[i].u * proj2
+                     + Vector(near_pt))
                 r = r.len()
             elif abs(projection3) > 1:
                 proj3 = projection3 - sign(projection3)
-                r = self.edges[i].rot * -projection1 \
-                    + self.edges[i].v * proj3 + Vector(near_pt)
+                r = (self.edges[i].rot * -projection1 + self.edges[i].v * proj3
+                     + Vector(near_pt))
                 r = r.len()
             
             if r < r_min:

@@ -6,6 +6,7 @@ from visualization import *
 
 pag.FAILSAFE = False
 
+
 class Events:
     """
     Стек событий
@@ -22,6 +23,10 @@ class Events:
             screen.update()
 
         Event.handle("OnRender", func)
+        
+        Args:
+            ev (str): Название добавляемого события,
+                к которому можно будет привязать обработку.
         """
         cls.evdata[ev] = []
     
@@ -30,15 +35,25 @@ class Events:
         """
         "Бронирует" функцию func на какое-то событие ev.
         Хранение функций, соответствующих событию (списку событий).
-
-        :param ev:
-        :param func:
-        :return:
+        
+        Args:
+            ev (str): Название события, к которому добавляется обработчик.
+            func (function): Функция обработки события.
         """
         cls.evdata[ev].append(func)
     
     @classmethod
     def remove(cls, ev: str, func: type(add)):
+        """
+        Удаление функции func из списка обработчиков события ev.
+        
+        Args:
+            ev (str): Название события.
+            func (function): Функция, которая будет удалена.
+
+        Returns:
+
+        """
         if len(cls.evdata[ev]) < 2:
             del cls.evdata[ev]
             return
@@ -64,6 +79,15 @@ class Events:
 
         sc1 = Canvas()
         Trigger.trigger("OnRender", sc1)
+        
+        Args:
+            ev (str): Название события.
+            *args: Аргументы функций обработчиков события.
+
+        Returns:
+            None: Если произошла ошибка или ни одна функция-обработчик
+                не вернула значение
+            Иначе, значение, которое вернула первая функция вернувшая не None.
         """
         try:
             for i in range(len(cls.evdata[ev])):
@@ -76,8 +100,18 @@ class Events:
 
 
 def move_forward(cam: Camera, speed=1):
-    if cam.look_dir != Vector(0, 1, 0) \
-       and cam.look_dir != Vector(0, -1, 0):
+    """
+    Перемещение камеры вперёд.
+    
+    Args:
+        cam (Camera): Камера.
+        speed (float): Скорость перемещения (по умолчанию на 1 координату).
+
+    Returns:
+        Camera: Камера с изменённым местоположением.
+    """
+    if (cam.look_dir != Vector(0, 1, 0)
+       and cam.look_dir != Vector(0, -1, 0)):
         tmp = cam.look_dir
         tmp.point.coords[1] = 0
         tmp = tmp.norm()
@@ -97,6 +131,16 @@ def move_forward(cam: Camera, speed=1):
 
 
 def move_backward(cam: Camera, speed=1):
+    """
+        Перемещение камеры назад.
+
+        Args:
+            cam (Camera): Камера.
+            speed (float): Скорость перемещения (по умолчанию на -1 координату).
+
+        Returns:
+            Camera: Камера с изменённым местоположением.
+        """
     if cam.look_dir != Vector(0, 1, 0) \
        and cam.look_dir != Vector(0, -1, 0):
         tmp = cam.look_dir
@@ -118,6 +162,7 @@ def move_backward(cam: Camera, speed=1):
 
 
 def move_left(cam: Camera, speed=1):
+    """Перемещение влево (относительно плоскости экрана)."""
     tmp = cam.screen.u
     # tmp.point.coords[1] = 0
     # tmp = tmp.norm()
@@ -127,6 +172,7 @@ def move_left(cam: Camera, speed=1):
 
 
 def move_right(cam: Camera, speed=1):
+    """Перемещение вправо (относительно плоскости экрана)."""
     tmp = cam.screen.u
     # tmp.point.coords[1] = 0
     # tmp = tmp.norm()
@@ -136,12 +182,14 @@ def move_right(cam: Camera, speed=1):
 
 
 def move_to_viewpoint(cam: Camera, speed=1):
+    """Перемещение камеры вперёд по направлению взгляда."""
     cam.pos = cam.pos + cam.look_dir.point * speed
     cam.screen.pos = cam.pos + cam.look_dir.point
     return cam
 
 
 def move_from_viewpoint(cam: Camera, speed=1):
+    """Перемещение камеры назад по направлению взгляда."""
     cam.pos = cam.pos - cam.look_dir.point * speed
     cam.screen.pos = cam.pos + cam.look_dir.point
     return cam
@@ -174,11 +222,13 @@ def launch(console: Console, camera_type: str = 'spectator',
     Функция, запускающая бесконечный цикл,
     в котором будут регистрироваться все действия пользователя
     (нажатие клавиш и перемещение мыши).
-
-    :param console: Консоль
-    :param camera_type: тип камеры ('spectator' или 'player')
-    :param sensitivity: чувствительность мыши
-    :param move_speed: скорость перемещения
+    
+    Args:
+        console (Console): Консоль.
+        camera_type (str): тип камеры ('spectator' или 'player',
+            реализован только 'spectator')
+        sensitivity (float): Чувствительность мыши.
+        move_speed (float): Скорость перемещения.
     """
     assert camera_type in ('spectator', 'player')
     
@@ -195,8 +245,7 @@ def launch(console: Console, camera_type: str = 'spectator',
             print("Work was stopped with exit code 1")
         
         def mv1(action: str):
-            console.cam = Events.trigger(action,
-                                         console.cam, move_speed)
+            console.cam = Events.trigger(action, console.cam, move_speed)
             console.draw()
         
         keyboard.add_hotkey('ctrl+q', close_console)
@@ -221,16 +270,19 @@ def launch(console: Console, camera_type: str = 'spectator',
                 difference[1] /= (pag.size()[1] // 2)
                 t, s = difference
                 
-                console.cam.look_dir = t * console.cam.screen.u \
-                    + s * console.cam.screen.v \
-                    + Vector(console.cam.screen.pos) \
+                console.cam.look_dir = (
+                    t * console.cam.screen.u + s * console.cam.screen.v
+                    + Vector(console.cam.screen.pos)
                     - Vector(console.cam.pos)
+                )
                 console.cam.look_dir = console.cam.look_dir.norm()
                 
                 console.cam.screen = BoundedPlane(
                     console.cam.pos + console.cam.look_dir.point,
                     console.cam.look_dir,
-                    console.cam.screen.du, console.cam.screen.dv)
+                    console.cam.screen.du,
+                    console.cam.screen.dv
+                )
                 
                 curr_pos = new_pos
                 # pag.PAUSE = 0.15
@@ -244,8 +296,7 @@ def launch(console: Console, camera_type: str = 'spectator',
                 curr_pos = pag.position()
     
     else:
-        # Здесь должно быть присвоение к классу Player,
-        # и перемещение камеры в соответствии с ограничениями
-        # (отсутствия возможности проходить сквозь объекты),
-        # но времени на раскачку нет
+        # TODO: Здесь должно быть присвоение к классу Player,
+        #  и перемещение камеры в соответствии с ограничениями
+        #  (отсутствия возможности проходить сквозь объекты).
         pass
